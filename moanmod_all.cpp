@@ -1549,7 +1549,22 @@ static void Run() {
     const std::string pkg = ReadProcessName();
     if (pkg.empty() || pkg.find(':') != std::string::npos) return;  // only the main game process
 
-    const std::string base = ResolveBase(pkg);
+    // Preferred data folder: Android/media/<package>/MoanMod. Unlike Android/data it can be opened with any file
+    // manager (no Shizuku / "access denied" problems), and the app may create it itself.
+    // Fallbacks: Android/data/<package>/files/MoanMod, then the private folder.
+    std::string base;
+    const std::string mediaDir = "/storage/emulated/0/Android/media/" + pkg + "/MoanMod";
+    const std::string dataDir = "/storage/emulated/0/Android/data/" + pkg + "/files/MoanMod";
+    for (int i = 0; i < 20 && base.empty(); i++) {
+        if (MakeDirs(mediaDir)) base = mediaDir;
+        else SleepMs(1000);
+    }
+    // the app's external files folder may not exist yet on the very first launch, so wait for it
+    for (int i = 0; i < 60 && base.empty(); i++) {
+        if (MakeDirs(dataDir)) base = dataDir;
+        else SleepMs(1000);
+    }
+    if (base.empty()) base = ResolveBase(pkg);
     LogInit(base + "/moanmod.log");
     Logf("==== MoanMod native starting (package %s) ====", pkg.c_str());
     Logf("Data folder: %s", base.c_str());
